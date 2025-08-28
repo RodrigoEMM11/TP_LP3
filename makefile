@@ -19,9 +19,10 @@ MKDIR=mkdir -p
 all: listing-1.1 listing-1.2 listing-1.3
 
 clean:
-	$(RM) $(BIN_DIR)/capitulo_1/1.1/*$(EXEEXT) \
-	      $(BIN_DIR)/capitulo_1/1.2/*$(EXEEXT) \
-	      $(BIN_DIR)/capitulo_1/1.3/*$(EXEEXT)
+	$(RM) $(BIN_DIR)/capitulo_1/1.1/*$(EXEEXT) $(BIN_DIR)/capitulo_1/1.1/*.o \
+	      $(BIN_DIR)/capitulo_1/1.2/*$(EXEEXT) $(BIN_DIR)/capitulo_1/1.2/*.o \
+	      $(BIN_DIR)/capitulo_1/1.3/*$(EXEEXT) $(BIN_DIR)/capitulo_1/1.3/*.o
+
 
 # === Listing 1.1 ===
 listing-1.1: $(BIN_DIR)/capitulo_1/1.1/main.o $(BIN_DIR)/capitulo_1/1.2/reciprocal.o
