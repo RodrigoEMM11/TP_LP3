@@ -1,0 +1,14 @@
+# Ignorar objetos compilados
+*.o
+
+# Ignorar ejecutables (Windows y Linux)
+*.exe
+*.out
+
+# Ignorar librerías compiladas
+*.a
+*.so
+
+# Ignorar carpeta bin, excepto .gitkeep
+/bin/*
+!/bin/.gitkeep
