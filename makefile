@@ -1,110 +1,86 @@
-# Forzar compiladores GCC/MinGW
-override CC=gcc
-override CXX=g++
+SRC_DIR := src
+BIN_DIR := bin
+CC := gcc
+CXX := g++
+CFLAGS := -Wall -Wextra -std=c11
+CXXFLAGS := -Wall -Wextra -std=c++17
 
-CFLAGS=-Wall -g
-CXXFLAGS=-Wall -g
+# Compilar un listing individual
+listing-%:
+	@bash -c '\
+	CHAPTER=$$(echo $* | cut -d. -f1); \
+	LISTING=$*; \
+	SRC=$$(pwd)/$(SRC_DIR); \
+	BIN=$$(pwd)/$(BIN_DIR); \
+	LISTING_DIR="$$SRC/capitulo_$$CHAPTER/$$LISTING"; \
+	if [ ! -d "$$LISTING_DIR" ]; then \
+		echo "No se encontró el directorio $$LISTING_DIR"; exit 1; \
+	fi; \
+	SRC_FILES=$$(find "$$LISTING_DIR" -type f \( -name "*.c" -o -name "*.cpp" \)); \
+	if [ -z "$$SRC_FILES" ]; then \
+		echo "No se encontraron fuentes en $$LISTING_DIR"; exit 1; \
+	fi; \
+	CHAPTER_SOURCES=$$(find "$$SRC/capitulo_$$CHAPTER" -mindepth 2 -type f \( -name "*.c" -o -name "*.cpp" \) ! -path "$$LISTING_DIR/*" -exec grep -L "int main" {} \;); \
+	INCLUDES=$$(find "$$SRC/capitulo_$$CHAPTER" -type d | sed "s/^/-I/"); \
+	DEST_DIR="$$BIN/capitulo_$$CHAPTER/$$LISTING"; \
+	mkdir -p "$$DEST_DIR"; \
+	EXE="$$DEST_DIR/listing-$$LISTING"; \
+	echo "Compilando $$SRC_FILES con dependencias auxiliares -> $$EXE"; \
+	if echo "$$SRC_FILES $$CHAPTER_SOURCES" | grep -q "\.cpp$$"; then \
+		$(CXX) $(CXXFLAGS) $$INCLUDES -o $$EXE $$SRC_FILES $$CHAPTER_SOURCES; \
+	else \
+		$(CC) $(CFLAGS) $$INCLUDES -o $$EXE $$SRC_FILES $$CHAPTER_SOURCES; \
+	fi; \
+	echo "Compilado: $$EXE"; \
+	'
 
-SRC_DIR=src
-BIN_DIR=bin
+# Compilar y ejecutar un listing
+run-%: listing-%
+	@CHAPTER=$$(echo $* | cut -d. -f1); \
+	LISTING=$*; \
+	BIN=$$(pwd)/$(BIN_DIR); \
+	EXE="$$BIN/capitulo_$$CHAPTER/$$LISTING/listing-$$LISTING"; \
+	if [ ! -f "$$EXE" ]; then \
+		echo "El ejecutable $$EXE no existe"; exit 1; \
+	fi; \
+	echo "Ejecutando $$EXE:"; \
+	"$$EXE"
 
-# Detectar extensión del ejecutable automáticamente (Windows vs Linux)
-EXEEXT := $(shell $(CC) -dumpmachine 2>/dev/null | grep -qi mingw && echo .exe)
+# Compilar todos los listings
+all:
+	@for chapter_dir in $(SRC_DIR)/capitulo_*; do \
+		chapter=$$(basename $$chapter_dir | cut -d'_' -f2); \
+		for listing_dir in $$chapter_dir/*; do \
+			listing=$$(basename $$listing_dir); \
+			$(MAKE) listing-$$listing; \
+		done; \
+	done
 
-# Comandos compatibles con MSYS2 y Linux
-RM=rm -rf
-MKDIR=mkdir -p
-
-# ============================================================
-# Directivas principales
-# ============================================================
-all: capitulo_1 capitulo_2
-
+# Limpia todo
 clean:
-	$(RM) $(BIN_DIR)/capitulo_1 $(BIN_DIR)/capitulo_2
+	@echo "Eliminando binarios y carpetas de bin..."
+	@rm -rf $(BIN_DIR)/capitulo_*
+	@echo "Hecho."
 
-# ============================================================
-# CAPITULO 1
-# ============================================================
-capitulo_1: listing-1.1 listing-1.2 listing-1.3
+# Limpia un listing específico: clean-X.Y
+clean-%:
+	@CHAPTER=$$(echo $* | cut -d. -f1); \
+	LISTING=$*; \
+	LISTING_DIR=$(BIN_DIR)/capitulo_$$CHAPTER/$$LISTING; \
+	if [ -d "$$LISTING_DIR" ]; then \
+		echo "Eliminando $$LISTING_DIR"; \
+		rm -rf "$$LISTING_DIR"; \
+	else \
+		echo "No existe $$LISTING_DIR"; \
+	fi
 
-# === Listing 1.1 ===
-listing-1.1: $(BIN_DIR)/capitulo_1/1.1/main.o $(BIN_DIR)/capitulo_1/1.2/reciprocal.o
-	$(CXX) -o $(BIN_DIR)/capitulo_1/1.1/listing-1.1$(EXEEXT) $^
-
-$(BIN_DIR)/capitulo_1/1.1/main.o: $(SRC_DIR)/capitulo_1/1.1/main.c $(SRC_DIR)/capitulo_1/1.3/reciprocal.hpp
-	@$(MKDIR) $(BIN_DIR)/capitulo_1/1.1
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/capitulo_1/1.3 -c $< -o $@
-
-$(BIN_DIR)/capitulo_1/1.2/reciprocal.o: $(SRC_DIR)/capitulo_1/1.2/reciprocal.cpp $(SRC_DIR)/capitulo_1/1.3/reciprocal.hpp
-	@$(MKDIR) $(BIN_DIR)/capitulo_1/1.2
-	$(CXX) $(CXXFLAGS) -I$(SRC_DIR)/capitulo_1/1.3 -c $< -o $@
-
-# === Listing 1.2 ===
-listing-1.2: $(BIN_DIR)/capitulo_1/1.2/main-1.2.o $(BIN_DIR)/capitulo_1/1.2/reciprocal.o
-	$(CXX) -o $(BIN_DIR)/capitulo_1/1.2/listing-1.2$(EXEEXT) $^
-
-$(BIN_DIR)/capitulo_1/1.2/main-1.2.o: $(SRC_DIR)/capitulo_1/1.2/main-1.2.c $(SRC_DIR)/capitulo_1/1.3/reciprocal.hpp
-	@$(MKDIR) $(BIN_DIR)/capitulo_1/1.2
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/capitulo_1/1.3 -c $< -o $@
-
-# === Listing 1.3 ===
-listing-1.3: $(BIN_DIR)/capitulo_1/1.3/main-1.3.o $(BIN_DIR)/capitulo_1/1.2/reciprocal.o
-	$(CXX) -o $(BIN_DIR)/capitulo_1/1.3/listing-1.3$(EXEEXT) $^
-
-$(BIN_DIR)/capitulo_1/1.3/main-1.3.o: $(SRC_DIR)/capitulo_1/1.3/main-1.3.c $(SRC_DIR)/capitulo_1/1.3/reciprocal.hpp
-	@$(MKDIR) $(BIN_DIR)/capitulo_1/1.3
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/capitulo_1/1.3 -c $< -o $@
-
-# ============================================================
-# CAPITULO 2
-# ============================================================
-capitulo_2: listing-2.1 listing-2.2 listing-2.3 listing-2.4 listing-2.5 listing-2.6 listing-2.7 listing-2.8 listing-2.9
-
-# === Listings (mapa exacto del capitulo 2) ===
-listing-2.1: $(BIN_DIR)/capitulo_2/2.1/listing-2.1$(EXEEXT)
-listing-2.2: $(BIN_DIR)/capitulo_2/2.2/listing-2.2$(EXEEXT)
-listing-2.3: $(BIN_DIR)/capitulo_2/2.3/listing-2.3$(EXEEXT)
-listing-2.4: $(BIN_DIR)/capitulo_2/2.4/listing-2.4$(EXEEXT)
-listing-2.5: $(BIN_DIR)/capitulo_2/2.5/listing-2.5$(EXEEXT)
-listing-2.6: $(BIN_DIR)/capitulo_2/2.6/listing-2.6$(EXEEXT)
-listing-2.7: $(BIN_DIR)/capitulo_2/2.7/listing-2.7$(EXEEXT)
-listing-2.8: $(BIN_DIR)/capitulo_2/2.8/listing-2.8$(EXEEXT)
-listing-2.9: $(BIN_DIR)/capitulo_2/2.9/listing-2.9$(EXEEXT)
-
-# === Reglas de compilación ===
-$(BIN_DIR)/capitulo_2/2.1/listing-2.1$(EXEEXT): $(SRC_DIR)/capitulo_2/2.1/arglist.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.1
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.2/listing-2.2$(EXEEXT): $(SRC_DIR)/capitulo_2/2.2/getopt_long.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.2
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.3/listing-2.3$(EXEEXT): $(SRC_DIR)/capitulo_2/2.3/print-env.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.3
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.4/listing-2.4$(EXEEXT): $(SRC_DIR)/capitulo_2/2.4/client.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.4
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.5/listing-2.5$(EXEEXT): $(SRC_DIR)/capitulo_2/2.5/temp_file.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.5
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.6/listing-2.6$(EXEEXT): $(SRC_DIR)/capitulo_2/2.6/readfile.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.6
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.7/listing-2.7$(EXEEXT): $(SRC_DIR)/capitulo_2/2.7/test.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.7
-	$(CC) $(CFLAGS) $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.8/listing-2.8$(EXEEXT): $(SRC_DIR)/capitulo_2/2.8/app.c $(BIN_DIR)/capitulo_2/2.7/test.o
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.8
-	$(CC) $(CFLAGS) -L$(BIN_DIR)/capitulo_2/2.7 -ltest $< -o $@
-
-$(BIN_DIR)/capitulo_2/2.9/listing-2.9$(EXEEXT): $(SRC_DIR)/capitulo_2/2.9/tifftest.c
-	@$(MKDIR) $(BIN_DIR)/capitulo_2/2.9
-	$(CC) $(CFLAGS) -static $< -ltiff -ljpeg -lz -lm -o $@
+# Limpia un capítulo completo: clean-capitulo_X
+clean-capitulo_%:
+	@CHAPTER=$*; \
+	CAP_DIR=$(BIN_DIR)/capitulo_$$CHAPTER; \
+	if [ -d "$$CAP_DIR" ]; then \
+		echo "Eliminando $$CAP_DIR"; \
+		rm -rf "$$CAP_DIR"; \
+	else \
+		echo "No existe $$CAP_DIR"; \
+	fi
